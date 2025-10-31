@@ -1,0 +1,64 @@
+log_format detailed_json escape=json '{'
+    '"timestamp":"$time_iso8601",'
+    '"remote_addr":"$remote_addr",'
+    '"request":"$request",'
+    '"status":$status,'
+    '"body_bytes_sent":$body_bytes_sent,'
+    '"request_time":$request_time,'
+    '"upstream_addr":"$upstream_addr",'
+    '"upstream_status":"$upstream_status",'
+    '"upstream_response_time":"$upstream_response_time",'
+    '"pool":"$upstream_http_x_app_pool",'
+    '"release":"$upstream_http_x_release_id",'
+    '"http_user_agent":"$http_user_agent"'
+'}';
+
+upstream app_backend {
+    server app_${ACTIVE_POOL}:${PORT} max_fails=2 fail_timeout=5s;
+    server app_blue:${PORT} backup max_fails=2 fail_timeout=5s;
+    server app_green:${PORT} backup max_fails=2 fail_timeout=5s;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    access_log /var/log/nginx/access.log detailed_json;
+    error_log /var/log/nginx/error.log warn;
+
+    proxy_connect_timeout 2s;
+    proxy_send_timeout 2s;
+    proxy_read_timeout 2s;
+
+    proxy_next_upstream error timeout http_500 http_502 http_503 http_504;
+    proxy_next_upstream_tries 3;
+    proxy_next_upstream_timeout 10s;
+
+    location / {
+        proxy_pass http://app_backend;
+        proxy_pass_request_headers on;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_pass_header X-App-Pool;
+        proxy_pass_header X-Release-Id;
+    }
+
+    location /healthz {
+        proxy_pass http://app_backend/healthz;
+        proxy_pass_request_headers on;
+        access_log off;
+    }
+
+    location /version {
+        proxy_pass http://app_backend/version;
+        proxy_pass_request_headers on;
+    }
+
+    location /chaos {
+        proxy_pass http://app_backend;
+        proxy_pass_request_headers on;
+    }
+}
