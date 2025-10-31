@@ -104,17 +104,17 @@ services:
 The `default.conf.template` dynamically builds the reverse proxy configuration based on environment variables.
 
 ```
-\# /etc/nginx/templates/default.conf.template
+# /etc/nginx/templates/default.conf.template
 
 upstream backend {
     zone backend 64k;
 
-    \# When ACTIVE_POOL=blue
+    # When ACTIVE_POOL=blue
     server app_blue:${PORT} max_fails=2 fail_timeout=5s;
     server app_green:${PORT} backup;
 
-    \# When ACTIVE_POOL=green
-    \# The toggle.sh script will swap this order automatically
+    # When ACTIVE_POOL=green
+    # The toggle.sh script will swap this order automatically
 }
 
 server {
