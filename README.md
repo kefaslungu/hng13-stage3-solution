@@ -2,8 +2,6 @@
 
 This project implements a blue-green deployment strategy for a Node.js application using Nginx as a reverse proxy and Docker Compose for orchestration. The setup ensures zero downtime during deployments by switching traffic between two application environments: blue and green.
 
----
-
 ## Overview
 
 The project demonstrates a robust deployment model where two versions of the same application run simultaneously. The Nginx reverse proxy dynamically routes traffic to the active environment (either blue or green), while the inactive one can be updated or tested safely.
@@ -16,13 +14,11 @@ This setup supports automatic failover, dynamic environment switching, and runti
 
 The system consists of three main services:
 
-1. **app_blue** – The blue instance of the application.
-2. **app_green** – The green instance of the application.
-3. **nginx** – Acts as a reverse proxy and load balancer between the two environments.
+1. App_blue: The blue instance of the application.
+2. App_green:  The green instance of the application.
+3. Nginx: Acts as a reverse proxy and load balancer between the two environments.
 
 Each app container runs the same image but has different environment variables such as `APP_POOL` and `RELEASE_ID`.
-
----
 
 ## File Structure
 
@@ -33,11 +29,8 @@ hng13-stage3-solution/
 ├── .env
 ├── nginx/
 │   └── default.conf.template
-├── toggle.sh
 └── README.md
 ```
-
----
 
 ## Environment Variables
 
@@ -59,8 +52,6 @@ RELEASE_ID_GREEN=green-1.0.0
 * `ACTIVE_POOL` – Determines which environment is live (either `blue` or `green`)
 * `PORT` – The internal port the application listens on; can be overridden by graders or CI/CD pipelines
 * `RELEASE_ID_BLUE` and `RELEASE_ID_GREEN` – Version identifiers for each deployment
-
----
 
 ## Docker Compose Configuration
 
@@ -108,24 +99,22 @@ services:
     restart: always
 ```
 
----
-
 ## Nginx Template
 
 The `default.conf.template` dynamically builds the reverse proxy configuration based on environment variables.
 
 ```
-# /etc/nginx/templates/default.conf.template
+\# /etc/nginx/templates/default.conf.template
 
 upstream backend {
     zone backend 64k;
 
-    # When ACTIVE_POOL=blue
+    \# When ACTIVE_POOL=blue
     server app_blue:${PORT} max_fails=2 fail_timeout=5s;
     server app_green:${PORT} backup;
 
-    # When ACTIVE_POOL=green
-    # The toggle.sh script will swap this order automatically
+    \# When ACTIVE_POOL=green
+    \# The toggle.sh script will swap this order automatically
 }
 
 server {
@@ -139,7 +128,6 @@ server {
 }
 ```
 
----
 
 ## Deployment Steps
 
@@ -171,8 +159,6 @@ server {
    X-Release-Id: blue-1.0.0
    ```
 
----
-
 ## Switching Environments
 
 To switch from blue to green, update the `.env` file:
@@ -189,8 +175,6 @@ docker compose up -d
 ```
 
 Nginx will now route all traffic to the green environment.
-
----
 
 ## Chaos Testing
 
@@ -210,7 +194,55 @@ curl -i http://localhost:8080/version
 
 The response will show that traffic has been redirected to the green pool automatically.
 
----
+
+## Logs and Alert Verification
+
+You can monitor system health and verify that alerts are reaching Slack.
+
+### View Watcher Logs
+
+Check the `alert_watcher` container logs to confirm it’s parsing Nginx events correctly:
+
+```bash
+docker logs -f alert_watcher
+```
+
+You should see messages showing detected error rates, failovers, or recovery actions.
+
+### Verify Slack Alerts
+
+Open your Slack channel connected to the webhook URL.
+You’ll receive real-time alerts when:
+
+* The blue or green app stops responding (failover)
+* Error rate crosses the threshold
+* The primary pool recovers
+
+Each alert message contains:
+
+* The event type (Failover, Error Rate, or Recovery)
+* A brief description
+* Recommended operator action (from the runbook)
+
+### Common Troubleshooting
+
+If you don’t see alerts:
+
+1. Check that the webhook URL in `.env` has **no spaces** before or after the URL.
+2. Restart the watcher:
+
+   ```bash
+   docker restart alert_watcher
+   ```
+3. Generate activity again by stopping or restarting one app.
+
+### Screenshots to Include
+
+When submitting, take screenshots of:
+
+1. The Slack channel showing alerts (Failover, Error Rate, and Recovery)
+2. Your terminal showing `docker ps` with all containers running
+3. A browser or `curl` result showing app responses from both Blue and Green pools
 
 ## Dynamic Port Handling
 
